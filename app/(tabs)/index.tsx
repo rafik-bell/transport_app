@@ -1,98 +1,232 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  StatusBar,
+  SafeAreaView,
+  FlatList,
+  ActivityIndicator,
+  Image
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+interface SubscriptionItem {
+  name: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  isSelected?: boolean;
+}
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+export default function Tickets() {
+  const navigation = useNavigation<any>();
+  const [subscriptions, setSubscriptions] = React.useState<SubscriptionItem[]>([]);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['operators'],
+    queryFn: async () => {
+      const res = await fetch('http://10.65.154.1:5000/operators'); // use 10.0.2.2 for Android
+      if (!res.ok) throw new Error('Failed to fetch subscriptions');
+      return res.json();
+    },
+  });
+
+  React.useEffect(() => {
+    if (data) {
+      const formatted = data.map((item: any) => ({ ...item, isSelected: false }));
+      setSubscriptions(formatted);
+    }
+  }, [data]);
+
+  const toggleSelect = (index: number) => {
+    setSubscriptions(prev =>
+      prev.map((item, i) =>
+        i === index ? { ...item, isSelected: !item.isSelected } : item
+      )
+    );
+  };
+
+  const sendSelected = () => {
+    const selected = subscriptions.filter(item => item.isSelected);
+    if (selected.length === 0) {
+      alert('Please select at least one subscription!');
+      return;
+    }
+    navigation.navigate('ticket', { selected });
+  };
+
+  const renderCard = ({ item, index }: any) => (
+    <TouchableOpacity
+      style={[styles.card, item.isSelected && styles.cardSelected]}
+      onPress={() => toggleSelect(index)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.iconContainer, item.isSelected && styles.iconContainerSelected]}>
+      <Image
+      source={{ uri: item.icon }} // <-- CDN URL
+      style={{ width: 32, height: 32, tintColor: item.isSelected ? '#fff' : '#2C5FA8' }}
+      resizeMode="contain"
+    />
+      </View>
+      <Text style={[styles.cardTitle, item.isSelected && styles.cardTitleSelected]}>
+        {item.name}
+      </Text>
+      <View style={styles.checkmarkContainer}>
+        <Ionicons
+          name={item.isSelected ? 'checkmark-circle' : 'checkmark-circle-outline'}
+          size={22}
+          color={item.isSelected ? '#4CAF50' : '#ccc'}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+      </View>
+    </TouchableOpacity>
+  );
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#2C5FA8" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Error loading subscriptions</Text>
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
+
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.logoContainer}>
+            <Ionicons name="bus" size={32} color="#fff" />
+          </View>
+          <View>
+            <Text style={styles.headerText}>TRANSPORT</Text>
+            <Text style={styles.headerSubtext}>Algiers Public Transit</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>Nos Tickets</Text>
+        <Text style={styles.subtitle}>
+          Sélectionnez vos moyens de transport préférés
+        </Text>
+      </View>
+
+      <FlatList
+        data={subscriptions}
+        renderItem={renderCard}
+        keyExtractor={(_, i) => i.toString()}
+        numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
+        contentContainerStyle={styles.subscriptionList}
+        showsVerticalScrollIndicator={false}
+      />
+
+      <TouchableOpacity style={styles.sendButton} onPress={sendSelected}>
+        <Text style={styles.sendButtonText}>Send Selected</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 }
 
+// Keep your existing styles
+
+
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: { flex: 1, backgroundColor: '#f5f7fa' },
+
+  header: {
+    backgroundColor: '#2C5FA8',
+    paddingTop: 20,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerContent: { flexDirection: 'row', alignItems: 'center' },
+  logoContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  headerText: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  headerSubtext: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 2, fontWeight: '500' },
+
+  titleContainer: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16 },
+  title: { fontSize: 26, fontWeight: '700', color: '#1a1a1a', marginBottom: 6 },
+  subtitle: { fontSize: 14, color: '#666', fontWeight: '400' },
+
+  subscriptionList: { paddingHorizontal: 15, paddingTop: 8, paddingBottom: 20 },
+  columnWrapper: { justifyContent: 'space-between', marginBottom: 16 },
+
+  card: {
+    flex: 1,
+    backgroundColor: '#fff',
+    marginHorizontal: 5,
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e8eef5',
+    shadowColor: '#2C5FA8',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    minHeight: 140,
+    justifyContent: 'space-between',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  cardSelected: {
+    borderColor: '#4A90E2',
+    backgroundColor: '#f0f7ff',
+    shadowOpacity: 0.15,
+    elevation: 6,
+    transform: [{ scale: 1.02 }],
+  },
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#e8f2ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  iconContainerSelected: { backgroundColor: '#4A90E2' },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#2C5FA8', textAlign: 'center', marginBottom: 8 },
+  cardTitleSelected: { color: '#1a5599' },
+  checkmarkContainer: { marginTop: 4 },
+
+  sendButton: {
+    backgroundColor: '#4A90E2',
+    marginHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sendButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });
