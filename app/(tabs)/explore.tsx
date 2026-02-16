@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -7,26 +7,40 @@ import {
   StatusBar,
   SafeAreaView,
   FlatList,
+  ActivityIndicator,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
+import { API } from '../../constants/config';
+
 
 interface SubscriptionItem {
-  title: string;
+  name: string;
+  icon: string;
   isSelected?: boolean;
-  icon: keyof typeof Ionicons.glyphMap;
 }
 
 export default function TabTwoScreen() {
   const navigation = useNavigation<any>();
+  const [subscriptions, setSubscriptions] = React.useState<SubscriptionItem[]>([]);
 
-  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([
-    { title: 'Bus', isSelected: false, icon: 'bus-outline' },
-    { title: 'Metro', isSelected: false, icon: 'train-outline' },
-    { title: 'Tramway', isSelected: false, icon: 'subway-outline' },
-    { title: 'Train', isSelected: false, icon: 'train-sharp' },
-    { title: 'Telepherique', isSelected: false, icon: 'boat-outline' },
-  ]);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['operators'],
+    queryFn: async () => {
+      const res = await fetch(`${API.BASE_URL}/operators`); // use 10.0.2.2 for Android
+      if (!res.ok) throw new Error('Failed to fetch subscriptions');
+      return res.json();
+    },
+  });
+
+  React.useEffect(() => {
+    if (data) {
+      const formatted = data.map((item: any) => ({ ...item, isSelected: false }));
+      setSubscriptions(formatted);
+    }
+  }, [data]);
 
   const toggleSelect = (index: number) => {
     setSubscriptions(prev =>
@@ -36,14 +50,13 @@ export default function TabTwoScreen() {
     );
   };
 
-  // Function to send selected subscriptions
   const sendSelected = () => {
     const selected = subscriptions.filter(item => item.isSelected);
     if (selected.length === 0) {
       alert('Please select at least one subscription!');
       return;
     }
-    navigation.navigate('subscribe', { selected }); // send to new page
+    navigation.navigate('subscribe', { selected });
   };
 
   const renderCard = ({ item, index }: any) => (
@@ -52,15 +65,15 @@ export default function TabTwoScreen() {
       onPress={() => toggleSelect(index)}
       activeOpacity={0.7}
     >
-      <View style={[styles.iconContainer, item.isSelected && styles.iconContainerSelected]}>
-        <Ionicons
-          name={item.icon}
-          size={32}
-          color={item.isSelected ? '#fff' : '#2C5FA8'}
-        />
-      </View>
+      <View >
+              <Image
+                source={{ uri: item.icon }}
+                style={[styles.iconContainer]}
+                resizeMode="contain"
+              />
+            </View>
       <Text style={[styles.cardTitle, item.isSelected && styles.cardTitleSelected]}>
-        {item.title}
+        {item.name}
       </Text>
       <View style={styles.checkmarkContainer}>
         <Ionicons
@@ -72,32 +85,40 @@ export default function TabTwoScreen() {
     </TouchableOpacity>
   );
 
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#2C5FA8" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Error loading subscriptions</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
 
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
-            <Ionicons name="bus" size={32} color="#fff" />
+            <Ionicons name="card" size={32} color="#fff" />
           </View>
           <View>
-            <Text style={styles.headerText}>TRANSPORT</Text>
+            <Text style={styles.headerText}>Abonnements</Text>
             <Text style={styles.headerSubtext}>Algiers Public Transit</Text>
           </View>
         </View>
       </View>
 
-      {/* Title */}
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>Nos Abonnements</Text>
-        <Text style={styles.subtitle}>
-          Sélectionnez vos moyens de transport préférés
-        </Text>
-      </View>
+     
 
-      {/* Grid */}
       <FlatList
         data={subscriptions}
         renderItem={renderCard}
@@ -108,7 +129,6 @@ export default function TabTwoScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Send Selected Button */}
       <TouchableOpacity style={styles.sendButton} onPress={sendSelected}>
         <Text style={styles.sendButtonText}>Send Selected</Text>
       </TouchableOpacity>
@@ -116,13 +136,16 @@ export default function TabTwoScreen() {
   );
 }
 
+// Keep your existing styles
+
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f7fa' },
 
   header: {
     backgroundColor: '#2C5FA8',
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingTop: 45,
+    paddingBottom: 22,
     paddingHorizontal: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

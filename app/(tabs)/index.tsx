@@ -13,11 +13,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
+import { API } from '../../constants/config';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface SubscriptionItem {
   name: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  isSelected?: boolean;
+  icon: string;
 }
 
 export default function Tickets() {
@@ -27,7 +28,7 @@ export default function Tickets() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['operators'],
     queryFn: async () => {
-      const res = await fetch('http://10.65.154.1:5000/operators'); // use 10.0.2.2 for Android
+      const res = await fetch(`${API.BASE_URL}/operators`);
       if (!res.ok) throw new Error('Failed to fetch subscriptions');
       return res.json();
     },
@@ -35,67 +36,54 @@ export default function Tickets() {
 
   React.useEffect(() => {
     if (data) {
-      const formatted = data.map((item: any) => ({ ...item, isSelected: false }));
-      setSubscriptions(formatted);
+      setSubscriptions(data);
     }
   }, [data]);
 
-  const toggleSelect = (index: number) => {
-    setSubscriptions(prev =>
-      prev.map((item, i) =>
-        i === index ? { ...item, isSelected: !item.isSelected } : item
-      )
-    );
-  };
-
-  const sendSelected = () => {
-    const selected = subscriptions.filter(item => item.isSelected);
-    if (selected.length === 0) {
-      alert('Please select at least one subscription!');
-      return;
-    }
-    navigation.navigate('ticket', { selected });
-  };
-
-  const renderCard = ({ item, index }: any) => (
+  const renderCard = ({ item }: { item: SubscriptionItem }) => (
     <TouchableOpacity
-      style={[styles.card, item.isSelected && styles.cardSelected]}
-      onPress={() => toggleSelect(index)}
+      style={styles.card}
+      onPress={() => navigation.navigate('ticket', { selected: item })}
       activeOpacity={0.7}
     >
-      <View style={[styles.iconContainer, item.isSelected && styles.iconContainerSelected]}>
-      <Image
-      source={{ uri: item.icon }} // <-- CDN URL
-      style={{ width: 32, height: 32, tintColor: item.isSelected ? '#fff' : '#2C5FA8' }}
-      resizeMode="contain"
-    />
-      </View>
-      <Text style={[styles.cardTitle, item.isSelected && styles.cardTitleSelected]}>
-        {item.name}
-      </Text>
-      <View style={styles.checkmarkContainer}>
-        <Ionicons
-          name={item.isSelected ? 'checkmark-circle' : 'checkmark-circle-outline'}
-          size={22}
-          color={item.isSelected ? '#4CAF50' : '#ccc'}
-        />
+      <View style={styles.cardInner}>
+        <View style={styles.iconWrapper}>
+          <Image
+            source={{ uri: item.icon }}
+            style={styles.iconContainer}
+            resizeMode="contain"
+          />
+        </View>
+        <Text style={styles.cardTitle}>{item.name}</Text>
+        <View style={styles.cardArrow}>
+          <Ionicons name="arrow-forward" size={18} color="#2C5FA8" />
+        </View>
       </View>
     </TouchableOpacity>
   );
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2C5FA8" />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color="#2C5FA8" />
+          <Text style={styles.loadingText}>Chargement...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Error loading subscriptions</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
+        <View style={styles.loader}>
+          <Ionicons name="alert-circle-outline" size={64} color="#E63946" />
+          <Text style={styles.errorText}>Erreur de chargement</Text>
+          <Text style={styles.errorSubtext}>Veuillez réessayer</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -103,25 +91,32 @@ export default function Tickets() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
 
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="bus" size={32} color="#fff" />
+      {/* Header with Gradient */}
+      <View style={styles.headerWrapper}>
+        <LinearGradient
+          colors={['#2C5FA8', '#3A7BC8']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
+            <View style={styles.logoContainer}>
+              <Ionicons name="ticket" size={28} color="#2C5FA8" />
+            </View>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerText}>Tickets</Text>
+              <Text style={styles.headerSubtext}>Algiers Public Transit</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.headerText}>TRANSPORT</Text>
-            <Text style={styles.headerSubtext}>Algiers Public Transit</Text>
-          </View>
-        </View>
+          
+          {/* Decorative circles */}
+          <View style={styles.decorativeCircle1} />
+          <View style={styles.decorativeCircle2} />
+        </LinearGradient>
       </View>
 
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>Nos Tickets</Text>
-        <Text style={styles.subtitle}>
-          Sélectionnez vos moyens de transport préférés
-        </Text>
-      </View>
-
+      
+      {/* Cards Grid */}
       <FlatList
         data={subscriptions}
         renderItem={renderCard}
@@ -131,102 +126,199 @@ export default function Tickets() {
         contentContainerStyle={styles.subscriptionList}
         showsVerticalScrollIndicator={false}
       />
-
-      <TouchableOpacity style={styles.sendButton} onPress={sendSelected}>
-        <Text style={styles.sendButtonText}>Send Selected</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }
 
-// Keep your existing styles
-
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
-
-  header: {
-    backgroundColor: '#2C5FA8',
-    paddingTop: 20,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F8FAFC' 
   },
-  headerContent: { flexDirection: 'row', alignItems: 'center' },
+  
+  loader: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC'
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748B',
+    fontWeight: '500'
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 18,
+    color: '#1E293B',
+    fontWeight: '600'
+  },
+  errorSubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#64748B'
+  },
+
+  // Header Styles
+  headerWrapper: {
+    elevation: 12,
+    shadowColor: '#2C5FA8',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+  },
+  header: {
+    paddingTop: 45,
+    paddingBottom: 22,
+    paddingHorizontal: 24,
+    overflow: 'hidden',
+  },
+  headerContent: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    zIndex: 2
+  },
   logoContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  headerText: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  headerSubtext: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 2, fontWeight: '500' },
+  headerTextContainer: {
+    flex: 1
+  },
+  headerText: { 
+    fontSize: 32, 
+    fontWeight: '900', 
+    color: '#FFFFFF',
+    letterSpacing: 0.5
+  },
+  headerSubtext: { 
+    fontSize: 14, 
+    color: 'rgba(255,255,255,0.9)', 
+    marginTop: 4,
+    fontWeight: '500'
+  },
 
-  titleContainer: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16 },
-  title: { fontSize: 26, fontWeight: '700', color: '#1a1a1a', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#666', fontWeight: '400' },
+  // Decorative Elements
+  decorativeCircle1: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: -40,
+    right: -30,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    bottom: -20,
+    right: 60,
+  },
 
-  subscriptionList: { paddingHorizontal: 15, paddingTop: 8, paddingBottom: 20 },
-  columnWrapper: { justifyContent: 'space-between', marginBottom: 16 },
+  // Title Section
+  titleContainer: { 
+    paddingHorizontal: 24, 
+    paddingTop: 32, 
+    paddingBottom: 20 
+  },
+  title: { 
+    fontSize: 28, 
+    fontWeight: '800', 
+    color: '#1E293B', 
+    marginBottom: 12,
+    letterSpacing: -0.5
+  },
+  subtitleWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  subtitleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2C5FA8',
+    marginRight: 10
+  },
+  subtitle: { 
+    fontSize: 15, 
+    color: '#64748B',
+    fontWeight: '500'
+  },
 
+  // Cards List
+  subscriptionList: { 
+    paddingHorizontal: 18, 
+    paddingTop: 8, 
+    paddingBottom: 24 
+  },
+  columnWrapper: { 
+    justifyContent: 'space-between', 
+    marginBottom: 20 
+  },
+
+  // Card Styles
   card: {
     flex: 1,
-    backgroundColor: '#fff',
-    marginHorizontal: 5,
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e8eef5',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 6,
+    borderRadius: 24,
+    elevation: 4,
     shadowColor: '#2C5FA8',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
     shadowRadius: 8,
-    elevation: 3,
-    minHeight: 140,
-    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden'
   },
-  cardSelected: {
-    borderColor: '#4A90E2',
-    backgroundColor: '#f0f7ff',
-    shadowOpacity: 0.15,
-    elevation: 6,
-    transform: [{ scale: 1.02 }],
+  cardInner: {
+    padding: 24,
+    alignItems: 'center',
+    minHeight: 160,
+    justifyContent: 'center',
   },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#e8f2ff',
+  iconWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  iconContainerSelected: { backgroundColor: '#4A90E2' },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: '#2C5FA8', textAlign: 'center', marginBottom: 8 },
-  cardTitleSelected: { color: '#1a5599' },
-  checkmarkContainer: { marginTop: 4 },
-
-  sendButton: {
-    backgroundColor: '#4A90E2',
-    marginHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 20,
+  iconContainer: {
+    width: 56,
+    height: 56,
   },
-  sendButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+  cardTitle: {
     fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 22
   },
+  cardArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4
+  }
 });

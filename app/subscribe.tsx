@@ -1,120 +1,120 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  SafeAreaView,
+ 
   FlatList,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
+import { API } from '../constants/config';
 import { useRoute } from '@react-navigation/native';
 
-interface SubscriptionItem {
-  title: string;
-  isExpanded: boolean;
-  items?: {
-    label: string;
-    price: string;
-  }[];
-  note?: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+interface CategoryItem {
+  name: string;
+  icon: string;
+  description?: string;
 }
 
 export default function Subscribe() {
-  const route = useRoute<any>();
-  const { selected } = route.params;
   const navigation = useNavigation<any>();
+  const route = useRoute();
+    const { selected } = route.params as any;
+    
 
-  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([
-    {
-      title: 'SCOLAIRE',
-      isExpanded: false,
-      icon: 'school',
-      note: '*Moins de 25 ans - Carte scolaire obligatoire',
-    },
-    {
-      title: 'ETUDIANT',
-      isExpanded: false,
-      icon: 'library',
-      note: '*Carte étudiant obligatoire',
-    },
-    {
-      title: 'JEUNE',
-      isExpanded: false,
-      icon: 'person',
-      note: '*25 à 60 ans',
-    },
-    {
-      title: 'TOUT PUBLIC',
-      isExpanded: false,
-      icon: 'people',
-      note: '*Disponible pour tous',
-    },
-    {
-      title: 'SENIOR',
-      isExpanded: false,
-      icon: 'accessibility',
-      note: '*Plus de 60 ans - Justificatif requis',
-    },
-    {
-      title: 'ABONNEMENT UNIQUE',
-      isExpanded: false,
-      icon: 'ticket',
-      note: '*Utilisation illimitée pendant la durée',
-    },
-  ]);
+  const [categories, setCategories] = React.useState<CategoryItem[]>([]);
 
-  const toggleSubscription = (index: number) => {
-    setSubscriptions(prev =>
-      prev.map((item, i) => ({
-        ...item,
-        isExpanded: i === index ? !item.isExpanded : false,
-      }))
-    );
+  // ✅ Fetch Categories
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await fetch(`${API.BASE_URL}/categories`);
+      if (!res.ok) throw new Error('Failed to fetch categories');
+      return res.json();
+    },
+  });
+
+  // ✅ Format Data
+  React.useEffect(() => {
+    if (data) {
+      setCategories(data);
+    }
+  }, [data]);
+
+  // ✅ Navigate to details screen
+  const openCategory = (item: CategoryItem) => {
+    navigation.navigate('SubscriptionScreen', {
+      category: item,
+      selected
+    });
   };
 
-  const renderCard = ({ item, index }: any) => (
+  // ✅ Card UI
+  const renderCard = ({ item }: { item: CategoryItem }) => (
     <TouchableOpacity
       style={styles.card}
-      onPress={() =>
-        navigation.navigate('SubscriptionScreen', {
-          subscription: item,
-        })
-      }
-      activeOpacity={0.7}
+      onPress={() => openCategory(item)}
+      activeOpacity={0.8}
     >
-      <View style={styles.iconContainer}>
-        <Ionicons 
-          name={item.icon || 'card'} 
-          size={32} 
-          color="#2C5FA8" 
-        />
-      </View>
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      <Text style={styles.note}>{item.note}</Text>
-      <View style={styles.arrowContainer}>
-        <Ionicons 
-          name="chevron-forward" 
-          size={20} 
-          color="#4A90E2" 
-        />
-      </View>
+      <View >
+              <Image
+                source={{ uri: item.icon }}
+                style={[styles.iconContainer]}
+                resizeMode="contain"
+              />
+            </View>
+
+      <Text style={styles.cardTitle}>{item.name}</Text>
+
+      {item.description && (
+        <Text style={styles.note}>
+          {item.description.replace(/<[^>]+>/g, '')}
+        </Text>
+      )}
+
+      <Ionicons
+        name="chevron-forward"
+        size={20}
+        color="#4A90E2"
+      />
     </TouchableOpacity>
   );
 
+  // ✅ Loading
+  if (isLoading) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color="#2C5FA8" />
+      </View>
+    );
+  }
+
+  // ✅ Error
+  if (error) {
+    return (
+      <View style={styles.loader}>
+        <Text>Error loading categories</Text>
+      </View>
+    );
+  }
+
+  // ✅ Main UI
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
 
-      {/* Header */}
-      
-
-      {/* Title Section */}
+     
+      {/* Title */}
       <View style={styles.titleContainer}>
-       
+        <Text style={styles.title}>Catégories</Text>
         <Text style={styles.subtitle}>
           Sélectionnez la catégorie qui vous correspond
         </Text>
@@ -122,7 +122,7 @@ export default function Subscribe() {
 
       {/* Grid */}
       <FlatList
-        data={subscriptions}
+        data={categories}
         renderItem={renderCard}
         keyExtractor={(_, i) => i.toString()}
         numColumns={2}
@@ -134,11 +134,10 @@ export default function Subscribe() {
   );
 }
 
+
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#f5f7fa' 
-  },
+  container: { flex: 1, backgroundColor: '#f5f7fa' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   header: {
     backgroundColor: '#2C5FA8',
@@ -151,69 +150,27 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  headerContent: { flexDirection: 'row', alignItems: 'center' },
+  logoContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
+  headerText: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  headerSubtext: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 2, fontWeight: '500' },
 
-  headerTextContainer: {
-    flex: 1,
-  },
+  titleContainer: { paddingHorizontal: 20,  paddingBottom: 16 },
+  title: { fontSize: 26, fontWeight: '700', color: '#1a1a1a', marginBottom: 6 },
+  subtitle: { fontSize: 14, color: '#666', fontWeight: '400' },
 
-  headerText: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.5,
-  },
-
-  headerSubtext: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-
-  titleContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 16,
-  },
-
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 6,
-  },
-
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '400',
-  },
-
-  subscriptionList: {
-    paddingHorizontal: 15,
-    paddingTop: 8,
-    paddingBottom: 20,
-  },
-
-  columnWrapper: {
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
+  subscriptionList: { paddingHorizontal: 15, paddingTop: 8, paddingBottom: 20 },
+  columnWrapper: { justifyContent: 'space-between', marginBottom: 16 },
 
   card: {
     flex: 1,
@@ -229,10 +186,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
-    minHeight: 180,
+    minHeight: 140,
     justifyContent: 'space-between',
   },
-
+  cardSelected: {
+    borderColor: '#4A90E2',
+    backgroundColor: '#f0f7ff',
+    shadowOpacity: 0.15,
+    elevation: 6,
+    transform: [{ scale: 1.02 }],
+  },
   iconContainer: {
     width: 64,
     height: 64,
@@ -242,90 +205,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  iconContainerSelected: { backgroundColor: '#4A90E2' },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#2C5FA8', textAlign: 'center', marginBottom: 8 },
+  cardTitleSelected: { color: '#1a5599' },
 
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#2C5FA8',
-    textAlign: 'center',
-    marginBottom: 8,
-    letterSpacing: 0.3,
+  sendButton: {
+    backgroundColor: '#4A90E2',
+    marginHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20,
   },
-
   note: {
-    fontSize: 11,
-    color: '#888',
+    fontSize: 12,
+    color: '#8a8a8a',
     textAlign: 'center',
     lineHeight: 16,
-    paddingHorizontal: 4,
-    flex: 1,
+    marginTop: 4,
+    paddingHorizontal: 6,
   },
-
-  arrowContainer: {
-    marginTop: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f0f7ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  cardContent: {
-    width: '100%',
-    marginTop: 15,
-  },
-
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-
-  priceLabel: { 
-    fontSize: 13, 
-    color: '#666' 
-  },
-
-  priceValue: { 
-    fontSize: 13, 
-    fontWeight: '600', 
-    color: '#333' 
-  },
-
-  logoContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-
-  bottomNav: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 10,
-  },
-
-  navButton: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  facebookButton: { backgroundColor: '#3b5998' },
-  linkedinButton: { backgroundColor: '#0077b5' },
-  twitterButton: { backgroundColor: '#1da1f2' },
-  instagramButton: { backgroundColor: '#e4405f' },
-  notificationButton: { backgroundColor: '#ff9800' },
+  sendButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });
