@@ -141,7 +141,7 @@ export default function SubscriptionScreen() {
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Activate Subscription</Text>
             <Text style={styles.modalText}>
-              Do you want to activate "{selectedProduct?.name}" for {selectedProduct?.price} DA?
+              {selectedProduct?.name} for {selectedProduct?.price} DA?
             </Text>
 
             <View style={styles.modalButtons}>
@@ -157,7 +157,7 @@ export default function SubscriptionScreen() {
                 onPress={() => {
                   setModalVisible(false);
                   // Navigate to PaymentScreen and pass product data
-                  router.replace('PaymentScreen', { product: selectedProduct });
+                  router.replace('/PaymentScreen');
                 }}
               >
                 <Text style={styles.modalButtonText}>Confirm</Text>

@@ -1,9 +1,10 @@
 // Register.tsx
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView ,Platform} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { API } from '../constants/config';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function Register() {
   const navigation = useNavigation<any>();
@@ -13,15 +14,21 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [focusedInput, setFocusedInput] = useState(''); // لتحديد أي عنصر في التركيز
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   const handleRegister = async () => {
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+    if (!lastName || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill all fields');
       return;
     }
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+    if (!acceptTerms) {
+      Alert.alert('Error', 'Please accept the terms and conditions');
       return;
     }
   
@@ -32,14 +39,12 @@ export default function Register() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: `${firstName} ${lastName}`,
+          name: lastName,
           login: email,
           email,
           password,
         }),
       });
-  
-      
   
       const json = JSON.parse(await response.text());
       console.log('RAW RESPONSE:', json);
@@ -65,13 +70,6 @@ export default function Register() {
       setLoading(false);
     }
   };
-  
-
-  // دالة لتحديد لون الحدود عند التركيز
-  const getInputStyle = (inputName: string) => [
-    styles.input,
-    focusedInput === inputName && styles.inputFocused,
-  ];
 
   return (
     <KeyboardAvoidingView 
@@ -82,120 +80,265 @@ export default function Register() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-    <View style={styles.container}>
-      <Text style={styles.title}>Register</Text>
+        
+        {/* Title and Description */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Créer un compte</Text>
+          <Text style={styles.subtitle}>
+            Veuillez remplir les informations suivantes afin de crée votre compte
+          </Text>
+        </View>
 
-      <TextInput
-        placeholder="First Name"
-        style={getInputStyle('firstName')}
-        value={firstName}
-        onChangeText={setFirstName}
-        editable={!loading}
-        onFocus={() => setFocusedInput('firstName')}
-        onBlur={() => setFocusedInput('')}
-      />
+        {/* Full Name Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Nom dutilisateur</Text>
+          <TextInput
+            placeholder="Nom d'utilisateur ..."
+            placeholderTextColor="#999"
+            style={styles.input}
+            value={lastName}
+            onChangeText={
+              setLastName
+            }
+            editable={!loading}
+          />
+        </View>
 
-      <TextInput
-        placeholder="Last Name"
-        style={getInputStyle('lastName')}
-        value={lastName}
-        onChangeText={setLastName}
-        editable={!loading}
-        onFocus={() => setFocusedInput('lastName')}
-        onBlur={() => setFocusedInput('')}
-      />
+        {/* Email Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            placeholder="Email ..."
+            placeholderTextColor="#999"
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!loading}
+          />
+        </View>
 
-      <TextInput
-        placeholder="Email"
-        style={getInputStyle('email')}
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        editable={!loading}
-        onFocus={() => setFocusedInput('email')}
-        onBlur={() => setFocusedInput('')}
-      />
+        {/* Password Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Mot de passe</Text>
+          <View style={styles.passwordContainer}>
+            <TextInput
+              placeholder="••••••••••"
+              placeholderTextColor="#999"
+              style={styles.passwordInput}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              editable={!loading}
+            />
+            <TouchableOpacity 
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeIcon}
+            >
+              <Ionicons 
+                name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                size={20} 
+                color="#999" 
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      <TextInput
-        placeholder="Password"
-        style={getInputStyle('password')}
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        editable={!loading}
-        onFocus={() => setFocusedInput('password')}
-        onBlur={() => setFocusedInput('')}
-      />
+        {/* Confirm Password Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Confirmer le mot de passe</Text>
+          <View style={styles.passwordContainer}>
+            <TextInput
+              placeholder="••••••••••"
+              placeholderTextColor="#999"
+              style={styles.passwordInput}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={!showConfirmPassword}
+              editable={!loading}
+            />
+            <TouchableOpacity 
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={styles.eyeIcon}
+            >
+              <Ionicons 
+                name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
+                size={20} 
+                color="#999" 
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      <TextInput
-        placeholder="Confirm Password"
-        style={getInputStyle('confirmPassword')}
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        secureTextEntry
-        editable={!loading}
-        onFocus={() => setFocusedInput('confirmPassword')}
-        onBlur={() => setFocusedInput('')}
-      />
+        {/* Terms and Conditions Checkbox */}
+        <TouchableOpacity 
+          style={styles.checkboxContainer}
+          onPress={() => setAcceptTerms(!acceptTerms)}
+        >
+          <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]}>
+            {acceptTerms && <Ionicons name="checkmark" size={16} color="#fff" />}
+          </View>
+          <Text style={styles.checkboxText}>
+            Accepter les <Text style={styles.linkText}>termes & conditions</Text> dutilisation.
+          </Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleRegister}
-        disabled={loading}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}
-      </TouchableOpacity>
-    </View>
-    </ScrollView>
+        {/* Register Button */}
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleRegister}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Enregistrer</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Already have account */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Vous possédez déjà un compte? </Text>
+          <TouchableOpacity onPress={() => router.push('/login')}>
+            <Text style={styles.footerLink}>Connectez vous</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f8f9fa',
-      },
-      scrollContent: {
-        flexGrow: 1,
-        paddingHorizontal: 24,
-        paddingTop: 60,
-        paddingBottom: 100,
-      },
-  
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  header: {
+    marginBottom: 15,
+  },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
     color: '#333',
+    marginBottom: 8,
   },
   input: {
     backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    padding: 16,
+    borderRadius: 12,
+    fontSize: 15,
+    color: '#000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  inputFocused: {
-    borderColor: '#6C63FF',
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 16,
+    fontSize: 15,
+    color: '#000',
+  },
+  eyeIcon: {
+    padding: 16,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    marginTop: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
     borderWidth: 2,
+    borderColor: '#DDD',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  checkboxText: {
+    fontSize: 13,
+    color: '#333',
+    flex: 1,
+  },
+  linkText: {
+    color: '#007AFF',
+    textDecorationLine: 'underline',
   },
   button: {
-    backgroundColor: '#6C63FF',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 10,
+    marginBottom: 20,
   },
   buttonDisabled: {
-    backgroundColor: '#a29bff',
+    backgroundColor: '#99CAFF',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  footer: {
+    alignItems: "center",
+    marginTop: 24,
+  },
+  footerText: {
+    fontSize: 14,
+  color: "#8E8E93",
+  marginBottom: 4, // spacing to next line
+  },
+  footerLink: {
+    fontSize: 14,
+    color: "#0A84FF",
+    fontWeight: "500",
   },
 });
+
+
