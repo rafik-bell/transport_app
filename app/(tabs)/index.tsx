@@ -102,22 +102,18 @@ export default function TransportApp() {
     if (!res) return;
     const { data, name } = res;
     setName(name || "");
-    console.log("data", data);
 
     const formatted = data.map((ticket :any) => {
 
 
       const activatedAt = new Date(ticket.activated_at);
-      console.log("activatedAt", activatedAt);
   
       const expiresAt = ticket.expires_at ? new Date(ticket.expires_at) : null;
-      console.log("expiresAt", expiresAt);
   
       // Total validity in days
       const allday = expiresAt
         ? Math.ceil((expiresAt.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24))
         : 0;
-        console.log("allday", allday);
   
       // Remaining days
       const daysLeft = expiresAt
