@@ -66,9 +66,12 @@ export default function LoginScreen() {
 
       if (data.result?.uid) {
         const uid = data.result.uid;
+        const name = data.result.name;
+
 
         // Save UID
         await AsyncStorage.setItem("uid", uid.toString());
+        await AsyncStorage.setItem("name", name.toString());
 
         // Extract session cookie
         const cookies = response.headers.get("set-cookie");

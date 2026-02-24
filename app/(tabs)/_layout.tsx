@@ -48,9 +48,9 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Home',
+            title: 'Accueil',
             tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="house.fill" color={color} />
+              <FontAwesome5 name="home" size={24} color={color} />
             ),
           }}
         />
@@ -59,21 +59,32 @@ export default function TabLayout() {
         <Tabs.Screen
           name="explore"
           options={{
-            title: 'Abonnements',
+            title: 'Formules',
             tabBarIcon: ({ color }) => (
-              <IconSymbol size={28} name="paperplane.fill" color={color} />
+              <FontAwesome5 name="clipboard-list" size={24} color={color} />
             ),
           }}
         />
+
+        <Tabs.Screen
+            name="tickets"
+            options={{
+              title: 'Tickets',
+              tabBarIcon: ({ color }) => (
+                <FontAwesome5 name="ticket-alt" size={24} color={color} />
+              ),
+              
+            }}
+          />
 
         {/* If logged in → show Profile */}
         
           <Tabs.Screen
             name="profile"
             options={{
-              title: 'Profile',
+              title: 'Paramètres',
               tabBarIcon: ({ color }) => (
-                <FontAwesome5 name="user-circle" size={24} color={color} />
+                <FontAwesome5 name="cog" size={24} color={color} />
               ),
               
             }}

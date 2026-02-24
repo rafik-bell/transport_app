@@ -157,7 +157,14 @@ export default function SubscriptionScreen() {
                 onPress={() => {
                   setModalVisible(false);
                   // Navigate to PaymentScreen and pass product data
-                  router.replace('/PaymentScreen');
+                  router.replace({
+                    pathname: '/PaymentScreen',
+                    params: {
+                      product: JSON.stringify(selectedProduct),
+                      category: JSON.stringify(category),
+                      selected: JSON.stringify(selected),
+                    },
+                  });
                 }}
               >
                 <Text style={styles.modalButtonText}>Confirm</Text>

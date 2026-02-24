@@ -1,324 +1,396 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  StatusBar,
-  SafeAreaView,
-  FlatList,
-  ActivityIndicator,
-  Image
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
+  ScrollView,
+  Animated,
+  Dimensions,
+  RefreshControl,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { API } from '../../constants/config';
-import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-interface SubscriptionItem {
-  name: string;
-  icon: string;
-}
+const { width: SCREEN_W } = Dimensions.get("window");
+const CARD_W = SCREEN_W - 48;
+const CARD_GAP = 16;
 
-export default function Tickets() {
-  const navigation = useNavigation<any>();
-  const [subscriptions, setSubscriptions] = React.useState<SubscriptionItem[]>([]);
+/* ---------------- DATA ---------------- */
+const trips = [
+  { id: 1, name: "Khelifa Boukhalfa", date: "08/02/2026", time: "19:23", icon: "train" },
+  { id: 2, name: "Bab El Oued", date: "08/02/2026", time: "18:20", icon: "tram", active: true },
+  { id: 3, name: "Bab El Oued", date: "08/02/2026", time: "18:20", icon: "tram", active: true },
+];
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['operators'],
-    queryFn: async () => {
-      const res = await fetch(`${API.BASE_URL}/operators`);
-      if (!res.ok) throw new Error('Failed to fetch subscriptions');
-      return res.json();
-    },
-  });
+/* ---------------- STATUS CONFIG ---------------- */
+const statusConfig = {
+  Actif: {
+    bg: "rgba(74,222,128,0.1)",
+    border: "rgba(74,222,128,0.25)",
+    color: "#4ade80",
+    showPulse: true,
+  },
+  Expiré: {
+    bg: "rgba(248,113,113,0.1)",
+    border: "rgba(248,113,113,0.25)",
+    color: "#f87171",
+    showPulse: false,
+  },
+};
 
-  React.useEffect(() => {
-    if (data) {
-      setSubscriptions(data);
-    }
-  }, [data]);
+/* ---------------- COMPONENTS ---------------- */
+const PulseDot = ({ color = "#4ade80" }) => {
+  const anim = useRef(new Animated.Value(1)).current;
 
-  const renderCard = ({ item }: { item: SubscriptionItem }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigation.navigate('ticket', { selected: item })}
-      activeOpacity={0.7}
-    >
-      <View style={styles.cardInner}>
-        <View style={styles.iconWrapper}>
-          <Image
-            source={{ uri: item.icon }}
-            style={styles.iconContainer}
-            resizeMode="contain"
-          />
-        </View>
-        <Text style={styles.cardTitle}>{item.name}</Text>
-        <View style={styles.cardArrow}>
-          <Ionicons name="arrow-forward" size={18} color="#2C5FA8" />
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#2C5FA8" />
-          <Text style={styles.loadingText}>Chargement...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
-        <View style={styles.loader}>
-          <Ionicons name="alert-circle-outline" size={64} color="#E63946" />
-          <Text style={styles.errorText}>Erreur de chargement</Text>
-          <Text style={styles.errorSubtext}>Veuillez réessayer</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
+    <Animated.View
+      style={[styles.pulseDot, { opacity: anim, backgroundColor: color }]}
+    />
+  );
+};
 
-      {/* Header with Gradient */}
-      <View style={styles.headerWrapper}>
-        <LinearGradient
-          colors={['#2C5FA8', '#3A7BC8']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
+/* ---------------- DATA FETCH ---------------- */
+const getactivetikitData = async () => {
+  try {
+    const uid = await AsyncStorage.getItem("uid");
+    const name = await AsyncStorage.getItem('name');
+    if (!uid) return null;
+
+    const response = await fetch(`${API.BASE_URL}/tickets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ customer: Number(uid) }),
+    });
+
+    const text = await response.text();
+
+    try {
+      const data = JSON.parse(text);
+      return { data, name };
+    } catch (e) {
+      console.log("Server returned HTML or error:", text);
+      return null;
+    }
+  } catch (error) {
+    console.error("Fetch tickets error:", error);
+    return null;
+  }
+};
+
+/* ---------------- MAIN SCREEN ---------------- */
+export default function TransportApp() {
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [name, setName] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const cardAnim = useRef(new Animated.Value(0)).current;
+
+  const loadTickets = async () => {
+    const res = await getactivetikitData();
+    if (!res) return;
+    const { data, name } = res;
+    setName(name || "");
+    console.log("data", data);
+
+    const formatted = data.map((ticket :any) => {
+
+
+      const activatedAt = new Date(ticket.activated_at);
+      console.log("activatedAt", activatedAt);
+  
+      const expiresAt = ticket.expires_at ? new Date(ticket.expires_at) : null;
+      console.log("expiresAt", expiresAt);
+  
+      // Total validity in days
+      const allday = expiresAt
+        ? Math.ceil((expiresAt.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+        console.log("allday", allday);
+  
+      // Remaining days
+      const daysLeft = expiresAt
+        ? Math.max(0, Math.ceil((expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+        : 0;
+      return{
+      id: ticket.id,
+      type: "Mensuel",
+      name: ticket.product,
+      modes: ticket.operators?.map((op :any) => op.toLowerCase()) || ["bus", "tram", "metro"],
+      status: ticket.status === "active" ? "Actif" : "Expiré",
+      allday,
+      daysLeft,
+      trips: ticket.remaining_uses || 0,
+      maxtrips: ticket.max_uses || 0,
+      accent: ticket.status === "active" ? "#60a5fa" : "#c084fc",
+      ticketNumber: ticket.ticket_number,
+    }});
+    setSubscriptions(formatted);
+  };
+
+  useEffect(() => {
+    Animated.timing(cardAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+    loadTickets();
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadTickets();
+    setRefreshing(false);
+  };
+
+  const onScroll = (e :any ) => {
+    const x = e.nativeEvent.contentOffset.x;
+    setActiveIdx(Math.round(x / (CARD_W + CARD_GAP)));
+  };
+
+  return (
+    <ScrollView
+      scrollEnabled={false} 
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      contentContainerStyle={{ flexGrow: 1 }}
+    >
+    <View style={styles.container}>
+      <LinearGradient colors={["#0D47A1", "#1565C0", "#42A5F5"]} style={styles.header}>
+        <Text style={styles.hello}>
+          Bonjour{"\n"}
+          <Text style={styles.username}>{name ? name : "Chargement..."}</Text>
+        </Text>
+
+        {/* dots */}
+        <View style={styles.dotRow}>
+          {subscriptions.map((sub, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                i === activeIdx
+                  ? [styles.dotActive, { backgroundColor: sub.accent }]
+                  : null,
+              ]}
+            />
+          ))}
+        </View>
+
+        {/* carousel */}
+        <ScrollView
+          horizontal
+          snapToInterval={CARD_W + CARD_GAP}
+          decelerationRate="fast"
+          showsHorizontalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.carouselContent}
         >
-          <View style={styles.headerContent}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="ticket" size={28} color="#2C5FA8" />
-            </View>
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.headerText}>Tickets</Text>
-              <Text style={styles.headerSubtext}>Algiers Public Transit</Text>
+          {subscriptions.map((sub :any) => {
+            const sc = statusConfig[sub.status] ?? statusConfig["Actif"];
+            return (
+              <Animated.View
+                key={sub.id}
+                style={{
+                  width: CARD_W,
+                  marginRight: CARD_GAP,
+                  opacity: cardAnim,
+                  transform: [
+                    {
+                      translateX: cardAnim.interpolate({
+                        inputRange: [-1, 0],
+                        outputRange: [20, 0],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <View style={styles.subCard}>
+                  <View style={styles.subCardTop}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.subLabel}>{sub.type.toUpperCase()}</Text>
+                      <Text style={styles.subTitle}>{sub.name}</Text>
+                      <Text style={styles.subModes}>{sub.modes.join(" · ")}</Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.activeBadge,
+                        { backgroundColor: sc.bg, borderColor: sc.border },
+                      ]}
+                    >
+                      {sc.showPulse && <PulseDot color={sc.color} />}
+                      <Text style={[styles.activeBadgeText, { color: sc.color }]}>
+                        {sub.status}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  <View style={styles.statsRow}>
+                    <View style={styles.stat}>
+                      <Text
+                        style={[
+                          styles.statValue,
+                          { color: sub.daysLeft <= 2 ? "red" : sub.accent }
+                        ]}
+                      >
+                        {sub.daysLeft}/{sub.allday}
+                      </Text>
+                      <Text style={styles.statLabel}>JOURS RESTANTS</Text>
+                    </View>
+
+                    <View style={styles.statSep} />
+
+                    <View style={styles.stat}>
+                      <Text style={styles.statValue}>{sub.trips}/{sub.maxtrips}</Text>
+                      <Text style={styles.statLabel}>COURSES</Text>
+                    </View>
+                  </View>
+                </View>
+              </Animated.View>
+            );
+          })}
+        </ScrollView>
+      </LinearGradient>
+
+      {/* trips */}
+      <ScrollView
+        contentContainerStyle={{ padding: 18 }}
+      >
+        <Text style={styles.section}>Dernières courses</Text>
+
+        {trips.map((t) => (
+          <View key={t.id} style={[styles.tripCard, t.active && styles.tripActive]}>
+            <View>
+              <Text style={styles.tripTitle}>{t.name}</Text>
+              <Text style={styles.tripTime}>
+                {t.date} • {t.time}
+              </Text>
             </View>
           </View>
-          
-          {/* Decorative circles */}
-          <View style={styles.decorativeCircle1} />
-          <View style={styles.decorativeCircle2} />
-        </LinearGradient>
-      </View>
-
-      
-      {/* Cards Grid */}
-      <FlatList
-        data={subscriptions}
-        renderItem={renderCard}
-        keyExtractor={(_, i) => i.toString()}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
-        contentContainerStyle={styles.subscriptionList}
-        showsVerticalScrollIndicator={false}
-      />
-    </SafeAreaView>
+        ))}
+      </ScrollView>
+    </View>
+    </ScrollView>
   );
 }
 
+/* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#F8FAFC' 
-  },
-  
-  loader: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC'
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#64748B',
-    fontWeight: '500'
-  },
-  errorText: {
-    marginTop: 16,
-    fontSize: 18,
-    color: '#1E293B',
-    fontWeight: '600'
-  },
-  errorSubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#64748B'
-  },
+  container: { flex: 1, backgroundColor: "#EEF3F9" },
 
-  // Header Styles
-  headerWrapper: {
-    elevation: 12,
-    shadowColor: '#2C5FA8',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-  },
   header: {
-    paddingTop: 45,
-    paddingBottom: 22,
-    paddingHorizontal: 24,
-    overflow: 'hidden',
+    paddingTop: 72,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
-  headerContent: { 
-    flexDirection: 'row', 
-    alignItems: 'center',
-    zIndex: 2
+
+  hello: { color: "white", fontSize: 20, marginBottom: 18 },
+  username: { fontSize: 26, fontWeight: "700" },
+
+  dotRow: {
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 22,
+    marginBottom: 14,
+    alignSelf: "flex-end",
   },
-  logoContainer: {
-    width: 64,
-    height: 64,
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.3)" },
+  dotActive: { width: 18, height: 6, borderRadius: 3 },
+
+  carouselContent: {
+    paddingLeft: 22,
+    paddingRight: 6,
+    paddingBottom: 6,
+  },
+
+  subCard: {
+    backgroundColor: "rgba(255,255,255,0.97)",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(92,165,255,0.15)",
+    padding: 24,
+  },
+
+  subCardTop: { flexDirection: "row", marginBottom: 20 },
+  subLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.4,
+    color: "#93c5fd",
+    marginBottom: 4,
+  },
+  subTitle: { fontSize: 17, fontWeight: "800", color: "#0f172a", marginBottom: 4 },
+  subModes: { fontSize: 12, fontWeight: "500", color: "#64748b" },
+
+  activeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  headerTextContainer: {
-    flex: 1
-  },
-  headerText: { 
-    fontSize: 32, 
-    fontWeight: '900', 
-    color: '#FFFFFF',
-    letterSpacing: 0.5
-  },
-  headerSubtext: { 
-    fontSize: 14, 
-    color: 'rgba(255,255,255,0.9)', 
-    marginTop: 4,
-    fontWeight: '500'
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    alignSelf: "flex-start",
   },
 
-  // Decorative Elements
-  decorativeCircle1: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    top: -40,
-    right: -30,
-  },
-  decorativeCircle2: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    bottom: -20,
-    right: 60,
-  },
-
-  // Title Section
-  titleContainer: { 
-    paddingHorizontal: 24, 
-    paddingTop: 32, 
-    paddingBottom: 20 
-  },
-  title: { 
-    fontSize: 28, 
-    fontWeight: '800', 
-    color: '#1E293B', 
-    marginBottom: 12,
-    letterSpacing: -0.5
-  },
-  subtitleWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  subtitleDot: {
+  pulseDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#2C5FA8',
-    marginRight: 10
+    marginRight: 6,
   },
-  subtitle: { 
-    fontSize: 15, 
-    color: '#64748B',
-    fontWeight: '500'
+  activeBadgeText: { fontSize: 11, fontWeight: "700" },
+
+  divider: { height: 1, backgroundColor: "rgba(0,0,0,0.07)", marginBottom: 16 },
+
+  statsRow: { flexDirection: "row", alignItems: "center" },
+  stat: { flex: 1 },
+  statValue: { fontSize: 24, fontWeight: "800", color: "#0f172a" },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: "600",
+    letterSpacing: 0.8,
+    color: "#94a3b8",
+    marginTop: 2,
+  },
+  statSep: {
+    width: 1,
+    height: 36,
+    backgroundColor: "rgba(0,0,0,0.08)",
+    marginHorizontal: 14,
   },
 
-  // Cards List
-  subscriptionList: { 
-    paddingHorizontal: 18, 
-    paddingTop: 8, 
-    paddingBottom: 24 
-  },
-  columnWrapper: { 
-    justifyContent: 'space-between', 
-    marginBottom: 20 
-  },
+  section: { fontWeight: "700", fontSize: 16, color: "#0D47A1", marginBottom: 14 },
 
-  // Card Styles
-  card: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 6,
-    borderRadius: 24,
-    elevation: 4,
-    shadowColor: '#2C5FA8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden'
-  },
-  cardInner: {
-    padding: 24,
-    alignItems: 'center',
-    minHeight: 160,
-    justifyContent: 'center',
-  },
-  iconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
-    textAlign: 'center',
+  tripCard: {
+    backgroundColor: "white",
+    borderRadius: 18,
+    padding: 16,
     marginBottom: 12,
-    lineHeight: 22
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    shadowColor: "#0D47A1",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+    borderWidth: 1.5,
+    borderColor: "transparent",
   },
-  cardArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 4
-  }
+
+  tripActive: { borderColor: "#42A5F5" },
+  tripTitle: { fontWeight: "700", fontSize: 15, marginBottom: 3, color: "#0f172a" },
+  tripTime: { fontSize: 12, color: "#78909C" },
 });

@@ -4,226 +4,252 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  StatusBar,
   SafeAreaView,
   FlatList,
   ActivityIndicator,
-  Image
+  Image,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { API } from '../../constants/config';
 
-
-interface SubscriptionItem {
+interface TransportItem {
+  id: string;
   name: string;
   icon: string;
-  isSelected?: boolean;
+  isSelected: boolean;
 }
 
-export default function TabTwoScreen() {
-  const navigation = useNavigation<any>();
-  const [subscriptions, setSubscriptions] = React.useState<SubscriptionItem[]>([]);
+export default function FormuleScreen() {
+  const navigation = useNavigation();
+  const [transports, setTransports] = React.useState<TransportItem[]>([]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['operators'],
     queryFn: async () => {
-      const res = await fetch(`${API.BASE_URL}/operators`); // use 10.0.2.2 for Android
-      if (!res.ok) throw new Error('Failed to fetch subscriptions');
+      const res = await fetch(`${API.BASE_URL}/operators`);
+      if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
   });
 
   React.useEffect(() => {
     if (data) {
-      const formatted = data.map((item: any) => ({ ...item, isSelected: false }));
-      setSubscriptions(formatted);
+      setTransports(
+        data.map((item: any) => ({ ...item, isSelected: false }))
+      );
     }
   }, [data]);
 
   const toggleSelect = (index: number) => {
-    setSubscriptions(prev =>
+    setTransports(prev =>
       prev.map((item, i) =>
         i === index ? { ...item, isSelected: !item.isSelected } : item
       )
     );
   };
 
-  const sendSelected = () => {
-    const selected = subscriptions.filter(item => item.isSelected);
+  const selectedCount = transports.filter(t => t.isSelected).length;
+
+  const handleNext = () => {
+    const selected = transports.filter(t => t.isSelected);
     if (selected.length === 0) {
-      alert('Please select at least one subscription!');
+      alert('Veuillez sélectionner au moins un moyen de transport.');
       return;
     }
-    navigation.navigate('subscribe', { selected });
+    navigation.navigate('subscribe' as never, { selected } as never);
   };
 
-  const renderCard = ({ item, index }: any) => (
+  const renderItem = ({ item, index }: { item: TransportItem; index: number }) => (
     <TouchableOpacity
       style={[styles.card, item.isSelected && styles.cardSelected]}
       onPress={() => toggleSelect(index)}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
-      <View >
-              <Image
-                source={{ uri: item.icon }}
-                style={[styles.iconContainer]}
-                resizeMode="contain"
-              />
-            </View>
-      <Text style={[styles.cardTitle, item.isSelected && styles.cardTitleSelected]}>
+      <Text style={[styles.cardName, item.isSelected && styles.cardNameSelected]}>
         {item.name}
       </Text>
-      <View style={styles.checkmarkContainer}>
-        <Ionicons
-          name={item.isSelected ? 'checkmark-circle' : 'checkmark-circle-outline'}
-          size={22}
-          color={item.isSelected ? '#4CAF50' : '#ccc'}
-        />
-      </View>
+      {item.icon ? (
+        <Image source={{ uri: item.icon }} style={styles.cardIcon} resizeMode="contain" />
+      ) : (
+        <View style={styles.iconPlaceholder} />
+      )}
     </TouchableOpacity>
   );
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2C5FA8" />
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#4CAF50" />
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Error loading subscriptions</Text>
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>Erreur lors du chargement</Text>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2C5FA8" />
-
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="card" size={32} color="#fff" />
-          </View>
-          <View>
-            <Text style={styles.headerText}>Abonnements</Text>
-            <Text style={styles.headerSubtext}>Algiers Public Transit</Text>
-          </View>
-        </View>
+        <Text style={styles.headerTitle}>Formules :</Text>
+        <Text style={styles.headerSubtitle}>
+          Veuillez sélectionner les moyens de transport{'\n'}
+          pour l'acquisition de votre titre de transport.
+        </Text>
       </View>
 
-     
-
+      {/* List */}
       <FlatList
-        data={subscriptions}
-        renderItem={renderCard}
+        data={transports}
         keyExtractor={(_, i) => i.toString()}
-        numColumns={2}
-        columnWrapperStyle={styles.columnWrapper}
-        contentContainerStyle={styles.subscriptionList}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
 
-      <TouchableOpacity style={styles.sendButton} onPress={sendSelected}>
-        <Text style={styles.sendButtonText}>Send Selected</Text>
-      </TouchableOpacity>
+      {/* Bottom button */}
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.nextButton} onPress={handleNext} activeOpacity={0.85}>
+          <Text style={styles.nextButtonText}>Suivant</Text>
+          {selectedCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{selectedCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
-// Keep your existing styles
-
+const CARD_HEIGHT = 72;
+const GREEN_SELECTED = '#A8E6A3';
+const BLUE_TEXT = '#1A56C4';
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f7fa' },
-
-  header: {
-    backgroundColor: '#2C5FA8',
-    paddingTop: 45,
-    paddingBottom: 22,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+  container: {
+    paddingTop: 30,
+    flex: 1,
+    backgroundColor: '#EAF1FB',
   },
-  headerContent: { flexDirection: 'row', alignItems: 'center' },
-  logoContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+  centered: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#EAF1FB',
   },
-  headerText: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  headerSubtext: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 2, fontWeight: '500' },
+  errorText: {
+    color: '#e53935',
+    fontSize: 16,
+  },
 
-  titleContainer: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16 },
-  title: { fontSize: 26, fontWeight: '700', color: '#1a1a1a', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#666', fontWeight: '400' },
+  // Header
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: BLUE_TEXT,
+    marginBottom: 6,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#555',
+    lineHeight: 20,
+  },
 
-  subscriptionList: { paddingHorizontal: 15, paddingTop: 8, paddingBottom: 20 },
-  columnWrapper: { justifyContent: 'space-between', marginBottom: 16 },
+  // List
+  listContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 12,
+  },
 
+  // Card
   card: {
-    flex: 1,
-    backgroundColor: '#fff',
-    marginHorizontal: 5,
-    borderRadius: 20,
-    padding: 20,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e8eef5',
-    shadowColor: '#2C5FA8',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    minHeight: 140,
     justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 50,
+    height: CARD_HEIGHT,
+    paddingHorizontal: 24,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardSelected: {
-    borderColor: '#4A90E2',
-    backgroundColor: '#f0f7ff',
-    shadowOpacity: 0.15,
-    elevation: 6,
-    transform: [{ scale: 1.02 }],
+    backgroundColor: GREEN_SELECTED,
+    borderColor: 'transparent',
   },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#e8f2ff',
+  cardName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: BLUE_TEXT,
+  },
+  cardNameSelected: {
+    color: BLUE_TEXT,
+  },
+  cardIcon: {
+    width: 70,
+    height: 50,
+  },
+  iconPlaceholder: {
+    width: 70,
+    height: 50,
+  },
+
+  // Footer
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+    paddingTop: 8,
+    alignItems: 'flex-end',
+  },
+  nextButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  nextButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#fff',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
   },
-  iconContainerSelected: { backgroundColor: '#4A90E2' },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: '#2C5FA8', textAlign: 'center', marginBottom: 8 },
-  cardTitleSelected: { color: '#1a5599' },
-  checkmarkContainer: { marginTop: 4 },
-
-  sendButton: {
-    backgroundColor: '#4A90E2',
-    marginHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  sendButtonText: {
+  badgeText: {
     color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
+    fontSize: 11,
+    fontWeight: '800',
   },
 });
