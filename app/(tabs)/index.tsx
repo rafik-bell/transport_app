@@ -7,10 +7,15 @@ import {
   Animated,
   Dimensions,
   RefreshControl,
+  Modal,
+  TouchableOpacity,
+  Alert
+
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { API } from '../../constants/config';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import QRCode from "react-native-qrcode-svg";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_W = SCREEN_W - 48;
@@ -78,14 +83,18 @@ const getactivetikitData = async () => {
 
     try {
       const data = JSON.parse(text);
+      console.log("data", data);
       return { data, name };
     } catch (e) {
       console.log("Server returned HTML or error:", text);
       return null;
     }
-  } catch (error) {
-    console.error("Fetch tickets error:", error);
-    return null;
+  } catch (error) {Alert.alert(
+      "Pas de connexion",
+      "Vérifiez votre connexion internet puis réessayez."
+    );
+       
+    
   }
 };
 
@@ -95,44 +104,74 @@ export default function TransportApp() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [name, setName] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [qrVisible, setQrVisible] = useState(false);
+  const [selectedQR, setSelectedQR] = useState<string | null>(null);
+
   const cardAnim = useRef(new Animated.Value(0)).current;
 
   const loadTickets = async () => {
-    const res = await getactivetikitData();
-    if (!res) return;
-    const { data, name } = res;
-    setName(name || "");
-
-    const formatted = data.map((ticket :any) => {
-
-
-      const activatedAt = new Date(ticket.activated_at);
+    try {
+      const res = await getactivetikitData();
   
-      const expiresAt = ticket.expires_at ? new Date(ticket.expires_at) : null;
+      // ✅ If API works → use server data + cache it
+      if (res && res.data) {
+        const { data, name } = res;
+        setName(name || "");
+        await AsyncStorage.setItem("offline_name", name || "");
   
-      // Total validity in days
-      const allday = expiresAt
-        ? Math.ceil((expiresAt.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24))
-        : 0;
+        const formatted = data.map((ticket: any) => {
+          const activatedAt = new Date(ticket.activated_at);
+          const expiresAt = ticket.expires_at ? new Date(ticket.expires_at) : null;
   
-      // Remaining days
-      const daysLeft = expiresAt
-        ? Math.max(0, Math.ceil((expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
-        : 0;
-      return{
-      id: ticket.id,
-      type: "Mensuel",
-      name: ticket.product,
-      modes: ticket.operators?.map((op :any) => op.toLowerCase()) || ["bus", "tram", "metro"],
-      status: ticket.status === "active" ? "Actif" : "Expiré",
-      allday,
-      daysLeft,
-      trips: ticket.remaining_uses || 0,
-      maxtrips: ticket.max_uses || 0,
-      accent: ticket.status === "active" ? "#60a5fa" : "#c084fc",
-      ticketNumber: ticket.ticket_number,
-    }});
-    setSubscriptions(formatted);
+          const allday = expiresAt
+            ? Math.ceil((expiresAt.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24))
+            : 0;
+  
+          const daysLeft = expiresAt
+            ? Math.max(0, Math.ceil((expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+            : 0;
+  
+          return {
+            id: ticket.id,
+            type: "Mensuel",
+            name: ticket.product,
+            modes: ticket.operators?.map((op: any) => op.toLowerCase()) || ["bus", "tram", "metro"],
+            status: ticket.status === "active" ? "Actif" : "Expiré",
+            allday,
+            daysLeft,
+            trips: ticket.remaining_uses || 0,
+            maxtrips: ticket.max_uses || 0,
+            accent: ticket.status === "active" ? "#60a5fa" : "#c084fc",
+            ticketNumber: ticket.ticket_number,
+            qr_code: ticket.qr_code,
+          };
+        });
+  
+        setSubscriptions(formatted);
+  
+        // ✅ SAVE OFFLINE COPY
+        await AsyncStorage.setItem("offline_tickets", JSON.stringify(formatted));
+        return;
+      }
+  
+      // ❌ API failed → load offline copy
+      const offline = await AsyncStorage.getItem("offline_tickets");
+      if (offline) {
+        setSubscriptions(JSON.parse(offline));
+      }
+  
+    } catch (err) {
+      console.log("Offline mode activated");
+  
+      const offline = await AsyncStorage.getItem("offline_tickets");
+      const offlineName = await AsyncStorage.getItem("offline_name");
+      if (offline) {
+        setSubscriptions(JSON.parse(offline));
+      }
+      if (offlineName) {
+        setName(offlineName);
+      }
+    }
   };
 
   useEffect(() => {
@@ -208,6 +247,16 @@ export default function TransportApp() {
                   ],
                 }}
               >
+
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => {
+                    if (sub.qr_code) {
+                      setSelectedQR(sub.qr_code);
+                      setQrVisible(true);
+                    }
+                  }}
+                >
                 <View style={styles.subCard}>
                   <View style={styles.subCardTop}>
                     <View style={{ flex: 1 }}>
@@ -252,6 +301,7 @@ export default function TransportApp() {
                     </View>
                   </View>
                 </View>
+                </TouchableOpacity>
               </Animated.View>
             );
           })}
@@ -276,6 +326,29 @@ export default function TransportApp() {
         ))}
       </ScrollView>
     </View>
+    <Modal
+  visible={qrVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setQrVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalBox}>
+      <Text style={styles.modalTitle}>QR Ticket</Text>
+
+      {selectedQR && (
+        <QRCode value={selectedQR} size={240} />
+      )}
+
+      <TouchableOpacity
+        style={styles.closeBtn}
+        onPress={() => setQrVisible(false)}
+      >
+        <Text style={{ color: "white", fontWeight: "700" }}>Fermer</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
     </ScrollView>
   );
 }
@@ -389,4 +462,33 @@ const styles = StyleSheet.create({
   tripActive: { borderColor: "#42A5F5" },
   tripTitle: { fontWeight: "700", fontSize: 15, marginBottom: 3, color: "#0f172a" },
   tripTime: { fontSize: 12, color: "#78909C" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  
+  modalBox: {
+    backgroundColor: "white",
+    borderRadius: 24,
+    padding: 26,
+    alignItems: "center",
+    width: "80%",
+  },
+  
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 20,
+    color: "#0D47A1",
+  },
+  
+  closeBtn: {
+    marginTop: 24,
+    backgroundColor: "#0D47A1",
+    paddingHorizontal: 26,
+    paddingVertical: 12,
+    borderRadius: 30,
+  },
 });

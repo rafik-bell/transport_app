@@ -1,11 +1,9 @@
 import { Tabs } from 'expo-router';
-import React, { useEffect, useState,useCallback } from 'react';
+import React, { useEffect, useState} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
 
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
@@ -59,9 +57,9 @@ export default function TabLayout() {
         <Tabs.Screen
           name="explore"
           options={{
-            title: 'Formules',
+            title: 'Tickets',
             tabBarIcon: ({ color }) => (
-              <FontAwesome5 name="clipboard-list" size={24} color={color} />
+              <FontAwesome5 name="ticket-alt" size={24} color={color} />
             ),
           }}
         />

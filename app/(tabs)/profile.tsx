@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Alert,
   TouchableOpacity,
+  ScrollView,
+  RefreshControl
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,69 +25,82 @@ export default function Profile() {
   const navigation = useNavigation<any>();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // ===============================
-  // Fetch Current User Info
+  // Fetch Current User Info (Offline-ready)
   // ===============================
-  useEffect(() => {
-    const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
+    try {
+      setLoading(true);
+      const uid = await AsyncStorage.getItem('uid');
+      if (!uid) {
+        Alert.alert('Error', 'User not found');
+        navigation.reset({ index: 0, routes: [{ name: 'login' }] });
+        return;
+      }
+
       try {
-        setLoading(true);
-
-        // Get logged-in UID from AsyncStorage
-        const uid = await AsyncStorage.getItem('uid');
-        if (!uid) {
-          Alert.alert('Error', 'User not found');
-          navigation.reset({ index: 0, routes: [{ name: 'login' }] });
-          return;
-        }
-
-        const response = await fetch(
-          `${API.BASE_URL_AUTH}/web/dataset/call_kw/res.users/read`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              method: 'call',
-              params: {
-                model: 'res.users',
-                method: 'read',
-                args: [[parseInt(uid)]], // fetch current user
-                kwargs: {
-                  fields: ['id', 'name', 'login', 'email', 'image_1920'],
-                },
-              },
-            }),
-          }
-        );
+        // Try fetching from API
+        const response = await fetch(`${API.BASE_URL_AUTH}/web/dataset/call_kw/res.users/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'call',
+            params: {
+              model: 'res.users',
+              method: 'read',
+              args: [[parseInt(uid)]],
+              kwargs: { fields: ['id', 'name', 'login', 'email', 'image_1920'] },
+            },
+          }),
+        });
 
         const data = await response.json();
 
         if (data.result && data.result.length > 0) {
           const u = data.result[0];
-
-          setUser({
+          const userData: User = {
             firstName: u.name?.split(' ')[0] || '',
             lastName: u.name?.split(' ').slice(1).join(' ') || '',
             email: u.email,
-            image: u.image_1920
-              ? `data:image/png;base64,${u.image_1920}`
-              : 'https://via.placeholder.com/150',
-          });
-        } else {
-          Alert.alert('Error', 'User not found');
-        }
-      } catch (error) {
-        console.log('Error fetching user:', error);
-        Alert.alert('Error', 'Unable to fetch user info');
-      } finally {
-        setLoading(false);
-      }
-    };
+            image: u.image_1920 ? `data:image/png;base64,${u.image_1920}` : 'https://via.placeholder.com/150',
+          };
 
+          setUser(userData);
+          await AsyncStorage.setItem('user', JSON.stringify(userData)); // Save offline
+          return;
+        } else {
+          throw new Error('User not found');
+        }
+      } catch (apiError) {
+        console.log('API fetch failed, trying offline:', apiError);
+        // Load from offline storage
+        const storedUser = await AsyncStorage.getItem('user');
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        } else {
+          Alert.alert('Error', 'Unable to fetch user info and no offline data found');
+        }
+      }
+    } catch (error) {
+      console.log('Unexpected error fetching user:', error);
+      Alert.alert('Error', 'Unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  }, [navigation]);
+
+  useEffect(() => {
     fetchUser();
-  }, []);
+  }, [fetchUser]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchUser();
+    setRefreshing(false);
+  };
 
   // ===============================
   // Logout Function
@@ -98,11 +113,8 @@ export default function Profile() {
         body: JSON.stringify({ jsonrpc: '2.0', method: 'call', params: {} }),
       });
 
-      // Clear stored UID & session
-      await AsyncStorage.removeItem('uid');
-      await AsyncStorage.removeItem('session_id');
+      await AsyncStorage.multiRemove(['uid', 'session_id', 'user']); // remove offline cache
 
-      // Reset navigation to login
       navigation.reset({
         index: 0,
         routes: [{ name: 'login' }],
@@ -130,19 +142,24 @@ export default function Profile() {
   // Profile UI
   // ===============================
   return (
-    <View style={styles.screen}>
-      <View style={styles.card}>
-        <Image source={{ uri: user.image }} style={styles.avatar} />
-        <Text style={styles.name}>
-          {user.firstName} {user.lastName}
-        </Text>
-        <Text style={styles.email}>{user.email}</Text>
+    <ScrollView
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      contentContainerStyle={{ flexGrow: 1 }}
+    >
+      <View style={styles.screen}>
+        <View style={styles.card}>
+          <Image source={{ uri: user.image }} style={styles.avatar} />
+          <Text style={styles.name}>
+            {user.firstName} {user.lastName}
+          </Text>
+          <Text style={styles.email}>{user.email}</Text>
 
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
