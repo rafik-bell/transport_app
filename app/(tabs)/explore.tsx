@@ -81,7 +81,7 @@ export default function FormuleScreen() {
       return;
     }
     if (mode === 'ticket') {
-      navigation.navigate('ticket' as never, { selected } as never);
+      navigation.navigate('produitTickit' as never, { selected } as never);
     } else {
       navigation.navigate('subscribe' as never, { selected } as never);
     }

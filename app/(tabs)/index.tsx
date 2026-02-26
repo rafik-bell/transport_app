@@ -76,7 +76,7 @@ const getactivetikitData = async () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ customer: Number(uid) }),
+      body: JSON.stringify({ customer: Number(uid) , mode :"A" }),
     });
 
     const text = await response.text();

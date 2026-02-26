@@ -67,9 +67,9 @@ export default function TabLayout() {
         <Tabs.Screen
             name="tickets"
             options={{
-              title: 'Tickets',
+              title: 'MY Tickets',
               tabBarIcon: ({ color }) => (
-                <FontAwesome5 name="ticket-alt" size={24} color={color} />
+                <FontAwesome5 name="address-card" size={24} color={color} />
               ),
               
             }}
