@@ -92,7 +92,7 @@ export default function LoginScreen() {
       }
     } catch (error) {
       console.log(error);
-      Alert.alert("Erreur", "Impossible de se connecter au serveur");
+  Alert.alert("Erreur", `Impossible de se connecter au serveur\n${error}`);
     } finally {
       setLoading(false);
     }
@@ -115,7 +115,7 @@ export default function LoginScreen() {
         <View style={styles.header}>
         <View style={styles.iconContainer}>
           <Image
-            source={require("../assets/images/smartest.png")} // path to your logo
+            source={require("../assets/images/smartest_fixed.png")} // path to your logo
             style={styles.logo} // custom style for sizing
             resizeMode="contain"
           />

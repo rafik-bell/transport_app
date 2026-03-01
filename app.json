@@ -4,7 +4,7 @@
     "slug": "MyPOS",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/smartest.png",
+    "icon": "./assets/images/smartest_fixed.png",
     "scheme": "mypos",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,11 +13,12 @@
       "bundleIdentifier": "com.rafik123.MyPOS"
     },
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/smartest.png",
-        "backgroundImage": "./assets/images/smartest.png",
-        "monochromeImage": "./assets/images/smartest.png"
+        "foregroundImage": "./assets/images/smartest_fixed.png",
+        "backgroundImage": "./assets/images/smartest_fixed.png",
+        "monochromeImage": "./assets/images/smartest_fixed.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -25,14 +26,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/smartest.png"
+      "favicon": "./assets/images/smartest_fixed.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/smartest.png",
+          "image": "./assets/images/smartest_fixed.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
